@@ -1,19 +1,26 @@
+#Librerias Necesarias para ejecucion de NCM
 import netmiko
 import time
 import re
 from datetime import datetime
 import os
 
+#Variables
 devices=[]
-num_reportes=[]
 name=""
 fecha=""
 hora=""
 direct=""
-last_report=""
+#Funcion que crear la carpeta de almacenamiento de las configuraciones de los routers
 def create_folder(name):
-        os.mkdir(f"C:/Users/vulpe/OneDrive/Escritorio/Practica02/{name}")
+        try:
+            os.mkdir(f"C:/Users/vulpe/OneDrive/Escritorio/Practica02/{name}")
+        except OSError:
+            print(f"La carptera de almacenamiento para {name} ya existe")
+        else:
+            print(f"Carpeta de almacenamiento para {name} ha sido creada exitosamente")
 
+#Funcion que crea el reporte de las configuraciones de los routers
 def create_report(disp):
     net_connect=netmiko.ConnectHandler(**disp)
     net_connect.enable()
@@ -24,46 +31,52 @@ def create_report(disp):
     fecha= datetime.now().strftime("%Y-%m-%d")
     hora=datetime.now().strftime('%H-%M-%S')
     direct=f"C:/Users/vulpe/OneDrive/Escritorio/Practica02/{name}/{name}-{fecha}-{hora}.txt"
-    if(last_report==""):
-        last_report=direct
-        
     with open(f"{direct}","w+") as file:
        for text in output:
            file.write(text)
     net_connect.disconnect()
     print("Document Create!!")
 
+#funcion que crea el objeto para realizar la conexion
 
-def compare_data(file):
-    print("Comparar los archivos de configuracion y si es similar, no crear archivo nuevo de configuracion. Caso contrario, crearlo")
-
-def create_device(ip,username,password,enable):
+def create_device(device_type,ip,username,password,secret,port):
     device={
-    'device_type':"cisco_ios_telnet",
+    'device_type':device_type,
     'ip': ip,
     'username':username,
     'password':password,
-    'secret':enable
+    'secret':secret,
+    'port':port
     }
-    
     return device
 
-def compare_compliance():
-    print("Compara las lineas de codigo por cada uno de las reglas de compliance que se deben cumplir y los guarda en el infotrme")
-
+#Inicio de ejcucion, se ingresan los valores de cada router, al igual que la cantidad de estos
 print("** Creating network Objects...")
 Quantity=int(input('Ingrese numero de dispositivos: '))
 while(Quantity>0):
-    ip=input('Ingrese la IP del dispositivo: ')
     print("\n\nInformacion Dispositivo\n\n")
+    ip=input('Ingrese la IP del dispositivo: ')
     username=input('Ingrese el usuario: ')
     password=input('Ingrese la contrase;a: ')
-    enable=input('Ingrese contrase;a de priv user: ')
-    router=create_device(ip,username,password,enable)
+    secret=input('Ingrese contrase;a de priv user: ')
+    device_type="cisco_ios"
+    port=22
+    router=create_device(device_type,ip,username,password,secret,port)
     devices.append(router)
     Quantity=Quantity-1
 
+#Es un ciclo que se ejecuta cada 20 seg
 while(1>0):
-    time.sleep(20)
     for disp in devices:
-        create_report(disp)
+        try:
+            create_report(disp)
+        except BaseException:
+            print("Coneccion fallida, intentando nueva conexion")
+            device_type="cisco_ios_telnet"
+            port=23
+            disp['device_type']=device_type
+            disp['port']=port
+            create_report(disp)
+            time.sleep(20)
+        else:
+            time.sleep(20)
